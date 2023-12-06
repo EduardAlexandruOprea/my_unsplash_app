@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 Future<void> main() async {
   await dotenv.load();
@@ -71,9 +72,17 @@ class PhotoListScreenState extends State<PhotoListScreen> {
 
     if (response.statusCode == 200) {
       final List<dynamic> body = json.decode(response.body) as List<dynamic>;
-      return body.map((dynamic item) => item as Map<String, dynamic>).toList();
+      return body.map((dynamic item) {
+        return <String, dynamic>{
+          'urls': item['urls'] as Map<String, dynamic>,
+          'name': item['alt_description'] as String? ?? 'No Title',
+          'description': item['description'] as String? ?? 'No Description',
+          'artistName': item['user']['name'] as String? ?? 'No Name',
+          'artistProfile': item['user']['links']['html'] as String? ?? 'No Profile'
+        };
+      }).toList();
     } else {
-      throw Exception('Eroare la folosirea API-ul');
+      throw Exception('Eroare la obtinerea datelor din API');
     }
   }
 
@@ -92,13 +101,29 @@ class PhotoListScreenState extends State<PhotoListScreen> {
               itemCount: _photos.length,
               itemBuilder: (BuildContext context, int index) {
                 final Map<String, dynamic> photo = _photos[index];
-                final Map<String, dynamic> urls = photo['urls'] as Map<String, dynamic>;
-                final String smallImageUrl = urls['small'] as String;
+                final String smallImageUrl = photo['urls']['small'] as String;
                 return Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: Image.network(
-                    smallImageUrl,
-                    fit: BoxFit.cover,
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    children: <Widget>[
+                      Image.network(
+                        smallImageUrl,
+                        fit: BoxFit.cover,
+                      ),
+                      Text('Name of the picture: ${photo['name']}'),
+                      Text('Description: ${photo['description']}'),
+                      Text("Artist's name: ${photo['artistName']}"),
+                      InkWell(
+                        child: const Text("Artist's profile", style: TextStyle(color: Colors.blue)),
+                        onTap: () async {
+                          final String urlString = photo['artistProfile'] as String;
+                          if (Uri.tryParse(urlString) != null && urlString != 'No Profile') {
+                            await launchUrl(Uri.parse(urlString));
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 1.5),
+                    ],
                   ),
                 );
               },
